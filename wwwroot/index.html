@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f5f0">
+  <title>雲端檔案管理</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c2925;
+      --muted: #74807a;
+      --line: #e2e7e1;
+      --canvas: #f4f5f0;
+      --paper: #fff;
+      --forest: #173c33;
+      --forest-soft: #244d42;
+      --mint: #dcebe3;
+      --lime: #d5e568;
+      --gold: #e6b460;
+      --rose: #ce7665;
+      --shadow: 0 18px 50px rgba(24, 51, 42, .08);
+      font-family: "Aptos", "Trebuchet MS", "Microsoft JhengHei", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; min-height: 100vh; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+    .sidebar {
+      min-height: 100vh;
+      padding: 25px 16px 20px;
+      color: #eaf1ec;
+      background: var(--forest);
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 9px; }
+    .brand-mark {
+      width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+      color: var(--forest); background: var(--lime); font-size: 18px; font-weight: 800;
+    }
+    .brand-name { font-family: Georgia, "Noto Serif TC", serif; font-size: 16px; font-weight: 700; }
+    .brand-caption { margin-top: 3px; color: #a7bdb3; font-size: 11px; }
+    .side-label { padding: 0 10px; color: #9eb5aa; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+    .side-nav { display: grid; gap: 5px; }
+    .side-button, .folder-button {
+      min-height: 40px; width: 100%; border: 0; border-radius: 7px; padding: 0 11px;
+      color: #d7e4dc; background: transparent; text-align: left; display: flex; align-items: center; gap: 10px;
+    }
+    .side-button:hover, .folder-button:hover { background: rgba(255,255,255,.08); }
+    .side-button.active, .folder-button.active { color: #192c25; background: var(--lime); font-weight: 700; }
+    .side-glyph { width: 19px; color: #bfd1c7; text-align: center; font-size: 16px; }
+    .active .side-glyph { color: var(--forest); }
+    .folder-tree { display: grid; gap: 2px; }
+    .folder-button { min-height: 34px; font-size: 13px; }
+    .folder-button .folder-glyph { color: #d3b866; }
+    .folder-button.active .folder-glyph { color: var(--forest); }
+    .side-foot { margin-top: auto; border-top: 1px solid rgba(255,255,255,.13); padding: 18px 10px 0; color: #a7bdb3; font-size: 11px; line-height: 1.6; }
+    .main { min-width: 0; padding: 0 36px 40px; }
+    .topbar {
+      height: 74px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px;
+    }
+    .top-context { display: flex; align-items: center; gap: 8px; }
+    .context-dot { width: 7px; height: 7px; border-radius: 50%; background: #76a98d; box-shadow: 0 0 0 4px #e0ece3; }
+    .profile { width: 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; color: #4f6b5e; background: #e5ece4; font-weight: 700; }
+    .content { width: min(1120px, 100%); margin: 0 auto; animation: arrive .45s ease-out both; }
+    .heading-row { padding: 29px 0 20px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+    .eyebrow { color: #76857b; font-size: 11px; font-weight: 700; }
+    h1 { margin: 6px 0 0; font-family: Georgia, "Noto Serif TC", serif; font-size: 27px; line-height: 1.2; font-weight: 600; }
+    .heading-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+    .actions { display: flex; gap: 9px; }
+    .button {
+      min-height: 39px; border: 1px solid var(--line); border-radius: 6px; padding: 0 13px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      color: #34473e; background: var(--paper); text-decoration: none; font-size: 12px; font-weight: 700;
+    }
+    .button:hover { border-color: #9cb6a6; background: #fbfcf9; }
+    .button.primary { color: white; border-color: var(--forest); background: var(--forest); }
+    .button.primary:hover { background: var(--forest-soft); }
+    .button-glyph { font-size: 16px; line-height: 1; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(255,255,255,.38); }
+    .metric { min-height: 82px; padding: 16px 20px; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric-label { color: var(--muted); font-size: 11px; }
+    .metric-value { margin-top: 7px; font-family: Georgia, "Noto Serif TC", serif; font-size: 22px; }
+    .metric-sub { margin-left: 7px; color: #829087; font-family: inherit; font-size: 11px; }
+    .toolbar { padding: 22px 0 13px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .breadcrumbs { min-width: 0; display: flex; align-items: center; gap: 7px; overflow: hidden; color: #8b968f; font-size: 12px; white-space: nowrap; }
+    .crumb { overflow: hidden; border: 0; padding: 4px 0; color: #52645a; background: transparent; text-overflow: ellipsis; }
+    .crumb:last-child { color: var(--ink); font-weight: 700; }
+    .toolbar-controls { display: flex; align-items: center; gap: 8px; }
+    .search { width: min(310px, 36vw); min-height: 38px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 0 10px; background: white; }
+    .search-icon { color: #799083; font-size: 17px; }
+    .search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
+    .search input::placeholder { color: #9da7a0; }
+    select { min-height: 38px; border: 1px solid var(--line); border-radius: 6px; padding: 0 28px 0 10px; color: #52645a; background: white; font-size: 12px; }
+    .list-heading { padding: 0 2px 10px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); box-shadow: var(--shadow); }
+    table { width: 100%; min-width: 740px; border-collapse: collapse; text-align: left; }
+    th { height: 39px; padding: 0 17px; border-bottom: 1px solid var(--line); color: #859087; background: #fafbf8; font-size: 10px; font-weight: 700; }
+    td { height: 58px; padding: 8px 17px; border-bottom: 1px solid #edf0eb; color: #53625a; font-size: 12px; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fbfcf8; }
+    .name-cell { display: flex; align-items: center; gap: 11px; color: var(--ink); font-weight: 700; }
+    .file-icon { width: 32px; height: 34px; flex: 0 0 32px; display: grid; place-items: center; border-radius: 6px; color: #315d4c; background: #e6f0e8; font-size: 10px; font-weight: 800; }
+    .file-icon.image { color: #936936; background: #f8efdc; }
+    .file-icon.text { color: #5e6987; background: #e9ecf5; }
+    .file-icon.folder { color: #8c6729; background: #f7edcf; font-size: 16px; }
+    .file-name { max-width: 390px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-sub { margin-top: 4px; color: #97a098; font-size: 10px; font-weight: 400; }
+    .type-pill { display: inline-block; border-radius: 4px; padding: 4px 7px; color: #647168; background: #f1f4ef; font-size: 10px; }
+    .size-cell { color: #33463c; font-variant-numeric: tabular-nums; }
+    .empty { padding: 52px 20px; color: var(--muted); text-align: center; font-size: 13px; }
+    .status-line { padding-top: 12px; color: #929c94; font-size: 10px; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 5; border-radius: 6px; padding: 12px 16px; color: white; background: var(--forest); box-shadow: var(--shadow); font-size: 12px; animation: arrive .2s ease-out both; }
+    @keyframes arrive { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 900px) {
+      .app-shell { grid-template-columns: 210px minmax(0, 1fr); }
+      .main { padding: 0 22px 32px; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+      .toolbar-controls { width: 100%; }
+      .search { width: auto; flex: 1; }
+      .file-name { max-width: 250px; }
+    }
+    @media (max-width: 620px) {
+      .app-shell { display: block; }
+      .sidebar { min-height: 0; padding: 12px 14px; flex-direction: row; align-items: center; gap: 12px; }
+      .brand { flex: 0 0 auto; padding: 0; }
+      .brand-mark { width: 32px; height: 32px; }
+      .brand-name { font-size: 14px; }
+      .brand-caption, .side-label, .side-nav, .folder-tree, .side-foot { display: none; }
+      .sidebar::after { content: "檔案工作區"; margin-left: auto; color: #aec2b7; font-size: 11px; }
+      .main { padding: 0 15px 28px; }
+      .topbar { height: 50px; }
+      .heading-row { align-items: flex-start; flex-direction: column; padding: 22px 0 16px; }
+      .actions { width: 100%; }
+      .actions .button { flex: 1; }
+      h1 { font-size: 24px; }
+      .metric { min-height: 70px; padding: 13px 10px; }
+      .metric-value { font-size: 18px; }
+      .metric-sub { display: block; margin: 4px 0 0; }
+      .toolbar-controls { flex-wrap: wrap; }
+      .search { flex-basis: 100%; }
+      select { flex: 1; }
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 610px; }
+      th, td { padding-right: 12px; padding-left: 12px; }
+      .file-name { max-width: 210px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
+  </style>
+  <style>
+    body { min-width: 320px; background: #f5f7fb; color: #1b2b41; font-family: "Aptos", "Trebuchet MS", "Microsoft JhengHei", sans-serif; }
+    button { font: inherit; }
+    .bench { min-height: 100vh; padding: 15px 18px; display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(290px, .92fr) minmax(270px, .92fr); grid-template-rows: 48px minmax(460px, 1fr); gap: 12px; }
+    .bench-toolbar { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 5px 8px; overflow-x: auto; border: 1px solid #dce4ee; border-radius: 10px; background: #fff; box-shadow: 0 2px 5px rgba(30, 55, 87, .06); }
+    .tool-group { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+    .tool-divider { width: 1px; height: 25px; flex: 0 0 1px; margin: 0 3px; background: #dce3ec; }
+    .tool-btn { height: 30px; min-width: 31px; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid transparent; border-radius: 6px; color: #415671; background: #fff; font-size: 11px; white-space: nowrap; }
+    .tool-btn:hover:not(:disabled) { border-color: #dbe4ef; background: #f4f7fb; }
+    .tool-btn:disabled { color: #b6c1ce; cursor: not-allowed; }
+    .tool-btn.command-btn { color: #415671; }
+    .tool-btn.command-btn .tool-icon { color: #647fa2; }
+    .delete-btn { color: #b4545d; }
+    .delete-btn:hover:not(:disabled) { border-color: #f0d3d4; color: #a83b46; background: #fff6f6; }
+    .tool-btn.active { color: #1758c8; border-color: #d3e2ff; background: #edf4ff; font-weight: 700; }
+    .tool-icon { width: 15px; color: #3374de; text-align: center; font-size: 15px; }
+    .command-icon { position: relative; width: 15px; height: 16px; display: inline-block; flex: 0 0 15px; color: currentColor; }
+    .copy-icon::before, .copy-icon::after { content: ""; position: absolute; width: 8px; height: 10px; border: 1.4px solid currentColor; border-radius: 2px; background: #fff; }
+    .copy-icon::before { top: 2px; left: 2px; }
+    .copy-icon::after { top: 5px; left: 5px; }
+    .paste-icon::before { content: ""; position: absolute; top: 4px; left: 3px; width: 9px; height: 10px; border: 1.4px solid currentColor; border-radius: 2px; }
+    .paste-icon::after { content: ""; position: absolute; top: 1px; left: 5px; width: 5px; height: 4px; border: 1.4px solid currentColor; border-radius: 2px; background: #fff; box-shadow: 0 7px 0 -1px currentColor; }
+    .tag-icon::before { content: ""; position: absolute; top: 3px; left: 1px; width: 13px; height: 10px; border-radius: 2px; background: currentColor; clip-path: polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%); }
+    .tag-icon::after { content: ""; position: absolute; top: 6px; left: 3px; width: 3px; height: 3px; border-radius: 50%; background: #fff; }
+    .sort-direction { min-width: 9px; color: #8597ad; font-size: 12px; font-weight: 700; }
+    .sort-btn.active .sort-direction { color: #1758c8; }
+    .trash-icon { position: relative; width: 14px; height: 16px; display: inline-block; color: currentColor; }
+    .trash-icon::before { content: ""; position: absolute; top: 6px; left: 3px; width: 8px; height: 8px; border: 1.4px solid currentColor; border-top: 0; border-radius: 0 0 2px 2px; }
+    .trash-icon::after { content: ""; position: absolute; top: 3px; left: 2px; width: 10px; height: 1.5px; border-radius: 1px; background: currentColor; }
+    .trash-icon span { position: absolute; top: 1px; left: 5px; width: 4px; height: 2px; border: 1px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; }
+    .trash-icon span::before, .trash-icon span::after { content: ""; position: absolute; top: 7px; width: 1px; height: 5px; background: currentColor; }
+    .trash-icon span::before { left: -1px; }
+    .trash-icon span::after { right: -7px; }
+    .toolbar-spacer { flex: 1 1 auto; min-width: 3px; }
+    .tag-tool { height: 28px; padding: 0 8px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e5eaf1; border-radius: 6px; color: #65768c; background: #fff; font-size: 10px; white-space: nowrap; }
+    .tag-tool:disabled { opacity: .48; cursor: not-allowed; }
+    .tag-tool[aria-pressed="true"] { border-color: #b9d1ff; background: #eef4ff; }
+    .tag-dot { width: 7px; height: 7px; border-radius: 50%; background: #ed6570; }
+    .tag-dot.work { background: #347be8; }
+    .tag-dot.personal { background: #20ae68; }
+    .tag-count { width: 15px; height: 15px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #ef6e7b; font-size: 9px; }
+    .tag-tool[data-tag="Work"] .tag-count { background: #397ce1; }
+    .tag-tool[data-tag="Personal"] .tag-count { background: #18a963; }
+    .add-file-btn { color: #17663f; border-color: #ccebd8; background: #effaf3; font-weight: 700; }
+    .add-file-btn:hover:not(:disabled) { border-color: #a7dcba; background: #e3f7e9; }
+    .add-file-dialog { width: min(440px, calc(100vw - 28px)); max-width: none; border: 1px solid #dce4ee; border-radius: 11px; padding: 0; color: #1b2b41; box-shadow: 0 24px 70px rgba(17, 32, 52, .24); }
+    .add-file-dialog::backdrop { background: rgba(12, 24, 42, .42); backdrop-filter: blur(2px); }
+    .file-form { padding: 20px; }
+    .file-form h2 { margin: 0; color: #1e3554; font-family: Georgia, "Noto Serif TC", serif; font-size: 20px; font-weight: 600; }
+    .form-context { margin: 6px 0 17px; overflow: hidden; color: #8190a4; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .form-field { min-width: 0; display: grid; gap: 6px; color: #64768e; font-size: 10px; }
+    .form-field.full { grid-column: 1 / -1; }
+    .form-field input, .form-field select { width: 100%; min-width: 0; height: 37px; border: 1px solid #dce4ee; border-radius: 6px; padding: 0 10px; outline: 0; color: #293e5b; background: #fff; font-size: 12px; }
+    .readonly-value { min-height: 37px; padding: 10px; border: 1px solid #e6ebf2; border-radius: 6px; color: #53657b; background: #f8fafc; font-size: 12px; }
+    .form-field input:focus, .form-field select:focus { border-color: #7ca8f2; box-shadow: 0 0 0 3px #eaf1ff; }
+    .type-fields { grid-column: 1 / -1; display: contents; }
+    .form-actions { margin-top: 19px; display: flex; justify-content: flex-end; gap: 8px; }
+    .form-action { height: 36px; border: 1px solid #dce4ee; border-radius: 6px; padding: 0 13px; color: #566980; background: #fff; font-size: 11px; }
+    .form-action.primary { border-color: #2464e8; color: white; background: #2464e8; font-weight: 700; }
+    .form-action.primary:hover { background: #1857d2; }
+    .bench-panel { min-width: 0; min-height: 0; overflow: hidden; border: 1px solid #dce4ee; border-radius: 11px; background: #fff; box-shadow: 0 2px 5px rgba(30, 55, 87, .05); }
+    .tree-panel { display: flex; flex-direction: column; }
+    .panel-heading { min-height: 47px; padding: 0 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf1f6; color: #1e3554; font-size: 13px; font-weight: 700; }
+    .panel-title { display: flex; align-items: center; gap: 8px; }
+    .panel-title-icon { color: #ed9a20; font-size: 15px; }
+    .panel-meta { color: #8b9aab; font-size: 10px; font-weight: 400; }
+    .tree-scroll { min-height: 0; flex: 1; overflow: auto; padding: 10px 12px 16px; }
+    .tree-root { min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border-radius: 7px; color: #fff; background: #2464e8; box-shadow: 0 2px 4px rgba(36, 100, 232, .2); font-size: 12px; font-weight: 700; }
+    .tree-root small, .node-size { color: #8b9caf; font-size: 9px; font-weight: 400; }
+    .tree-children { margin: 3px 0 0 12px; padding-left: 13px; border-left: 1px solid #e2e8f1; }
+    .tree-node { min-width: 0; }
+    .node-row { min-height: 31px; margin: 2px 0; padding: 4px 7px; display: flex; align-items: center; gap: 7px; border: 1px solid transparent; border-radius: 6px; color: #344a68; cursor: pointer; font-size: 11px; }
+    .node-row:hover { border-color: #e2eaf6; background: #f7f9fc; }
+    .node-row.selected { border-color: #bdd4ff; color: #1355d0; background: #edf4ff; box-shadow: 0 1px 3px rgba(54, 112, 210, .09); }
+    .node-row.match { border-color: #c6dbff; background: #f1f6ff; }
+    .node-glyph { width: 15px; flex: 0 0 15px; color: #3377ed; text-align: center; font-size: 13px; }
+    .node-glyph.folder { color: #d79521; }
+    .node-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .node-detail { min-width: 0; overflow: hidden; color: #8294ad; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .node-tags { margin-left: auto; display: flex; gap: 4px; }
+    .node-tag { border-radius: 4px; padding: 3px 5px; color: #fff; background: #ed5962; font-size: 8px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+    .node-tag.work { background: #347be8; }
+    .node-tag.personal { background: #19aa62; }
+    .node-size { flex: 0 0 auto; }
+    .right-stack { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(170px, .78fr) minmax(190px, 1fr); gap: 12px; }
+    .operation-panel, .observer-panel { padding-bottom: 12px; }
+    .operation-list { padding: 10px 12px; display: grid; gap: 6px; }
+    .operation-btn { min-height: 36px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; border: 0; border-radius: 7px; color: #2258c8; background: #edf3ff; text-align: left; font-size: 11px; }
+    .operation-btn:hover { background: #e3edff; }
+    .operation-btn.xml { color: #b45a13; background: #fff8e9; }
+    .operation-btn.xml:hover { background: #fff1d6; }
+    .operation-icon { font-size: 14px; }
+    .search-control { padding: 0 12px 10px; display: flex; gap: 6px; }
+    .search-control input { min-width: 0; height: 34px; flex: 1; border: 1px solid #dce4ee; border-radius: 7px; padding: 0 10px; outline: none; color: #293e5b; font-size: 11px; }
+    .search-control input:focus { border-color: #7ca8f2; box-shadow: 0 0 0 3px #eaf1ff; }
+    .search-submit { height: 34px; border: 0; border-radius: 7px; padding: 0 11px; color: #16834b; background: #e8f8ef; font-size: 11px; font-weight: 700; }
+    .search-submit:hover { background: #d9f3e5; }
+    .observer-title { border-bottom: 0; }
+    .live-pill { border-radius: 10px; padding: 3px 7px; color: #fff; background: #3f86ee; font-size: 8px; }
+    .observer-content { padding: 0 12px; display: grid; gap: 10px; }
+    .observer-box { min-height: 54px; border: 1px solid #edf1f6; border-radius: 8px; padding: 11px 12px; background: #f8fafc; }
+    .observer-label { color: #8190a4; font-size: 9px; }
+    .observer-value { margin-top: 7px; overflow: hidden; color: #245dcc; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .progress-head { display: flex; justify-content: space-between; }
+    .progress-number { color: #2464e8; font-size: 11px; }
+    .progress-track { height: 7px; margin-top: 9px; overflow: hidden; border-radius: 5px; background: #dfe9f8; }
+    .progress-fill { width: 0; height: 100%; border-radius: inherit; background: #4a8ef4; transition: width .15s ease; }
+    .progress-foot { margin-top: 6px; color: #8292aa; text-align: right; font-size: 8px; }
+    .console-panel { min-height: 0; display: flex; flex-direction: column; border-color: #111d34; color: #d3deef; background: #101a30; }
+    .console-heading { min-height: 42px; padding: 0 14px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid rgba(255,255,255,.08); color: #8fc0ff; font-size: 9px; letter-spacing: .08em; }
+    .console-status { width: 7px; height: 7px; border-radius: 50%; background: #3c8aff; box-shadow: 0 0 0 3px rgba(60,138,255,.13); }
+    .console-output { flex: 1; overflow: auto; padding: 8px 12px 12px; font: 10px/1.55 Consolas, "Cascadia Code", monospace; }
+    .console-line { min-height: 25px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.055); overflow-wrap: anywhere; color: #a8b8d1; }
+    .console-line.success { color: #22d88a; }
+    .console-line.warning { color: #ffc368; }
+    .console-line.muted { color: #778aa7; }
+    .console-result { margin: 10px 0 0; border: 1px solid #284c82; border-radius: 5px; padding: 9px 10px; color: #dce9ff; background: #172b4d; font: 700 11px "Aptos", sans-serif; }
+    .empty-tree { padding: 28px 10px; color: #8b9aab; text-align: center; font-size: 11px; }
+    @media (max-width: 1050px) {
+      .bench { grid-template-columns: minmax(0, 1.45fr) minmax(270px, .85fr); grid-template-rows: 48px minmax(430px, auto) minmax(250px, 300px); }
+      .console-panel { grid-column: 1 / -1; }
+      .right-stack { grid-column: 2; grid-row: 2; }
+      .tree-panel { grid-column: 1; grid-row: 2; }
+      .console-panel { grid-row: 3; }
+    }
+    @media (max-width: 680px) {
+      .bench { padding: 10px; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(370px, auto) auto minmax(220px, 280px); gap: 10px; }
+      .bench-toolbar { grid-column: 1; grid-row: 1; min-height: 44px; }
+      .tree-panel { grid-column: 1; grid-row: 2; }
+      .right-stack { grid-column: 1; grid-row: 3; grid-template-rows: auto auto; }
+      .console-panel { grid-column: 1; grid-row: 4; }
+      .tree-scroll { max-height: 60vh; }
+      .right-stack { gap: 10px; }
+      .operation-panel { min-height: 125px; }
+      .observer-panel { min-height: 200px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <main class="bench" aria-label="雲端檔案管理工作台">
+    <header class="bench-toolbar" aria-label="檔案操作工具列">
+      <div class="tool-group">
+        <button class="tool-btn" id="undo" title="復原" aria-label="復原" disabled><span class="tool-icon">↶</span></button>
+        <button class="tool-btn" id="redo" title="重做" aria-label="重做" disabled><span class="tool-icon">↷</span></button>
+      </div>
+      <span class="tool-divider"></span>
+      <div class="tool-group">
+        <button class="tool-btn command-btn" id="copy" title="複製所選檔案或資料夾" aria-label="複製" disabled><span class="command-icon copy-icon" aria-hidden="true"></span>複製</button>
+        <button class="tool-btn command-btn" id="paste" title="貼到所選資料夾" aria-label="貼上" disabled><span class="command-icon paste-icon" aria-hidden="true"></span>貼上</button>
+        <button class="tool-btn delete-btn" id="delete" title="刪除所選節點" aria-label="刪除" disabled><span class="trash-icon" aria-hidden="true"><span></span></span>刪除</button>
+        <button class="tool-btn add-file-btn" id="add-file" title="在所選資料夾新增檔案" aria-label="新增檔案" disabled><span class="tool-icon">＋</span>新增檔案</button>
+      </div>
+      <span class="tool-divider"></span>
+      <div class="tool-group" aria-label="排序方式">
+        <span class="tool-icon">☷</span>
+        <button class="tool-btn sort-btn" data-sort="名稱" data-label="名稱" title="依名稱排序；首次降冪，再按升冪" aria-label="依名稱排序，首次降冪">名稱 <span class="sort-direction" aria-hidden="true">↕</span></button>
+        <button class="tool-btn sort-btn" data-sort="大小" data-label="大小" title="依大小排序；首次降冪，再按升冪" aria-label="依大小排序，首次降冪">大小 <span class="sort-direction" aria-hidden="true">↕</span></button>
+        <button class="tool-btn sort-btn" data-sort="副檔名" data-label="類型" title="依副檔名排序；首次降冪，再按升冪" aria-label="依副檔名排序，首次降冪">類型 <span class="sort-direction" aria-hidden="true">↕</span></button>
+      </div>
+      <span class="tool-divider"></span>
+      <div class="tool-group" aria-label="標籤">
+        <span class="command-icon tag-icon" role="img" aria-label="標籤"></span>
+        <button class="tag-tool" data-tag="Urgent" aria-pressed="false"><span class="tag-dot"></span>+ Urgent <span class="tag-count">0</span></button>
+        <button class="tag-tool" data-tag="Work" aria-pressed="false"><span class="tag-dot work"></span>+ Work <span class="tag-count">0</span></button>
+        <button class="tag-tool" data-tag="Personal" aria-pressed="false"><span class="tag-dot personal"></span>+ Personal <span class="tag-count">0</span></button>
+      </div>
+      <span class="toolbar-spacer"></span>
+      <span class="panel-meta" id="selection-label">尚未選取</span>
+    </header>
+
+    <section class="bench-panel tree-panel" aria-label="檔案階層">
+      <header class="panel-heading"><span class="panel-title"><span class="panel-title-icon">▱</span>檔案階層（Composite）</span><span class="panel-meta" id="tree-size">--</span></header>
+      <div class="tree-scroll" id="file-tree"><div class="empty-tree">正在載入檔案樹…</div></div>
+    </section>
+
+    <div class="right-stack">
+      <section class="bench-panel operation-panel" aria-label="訪問者操作">
+        <header class="panel-heading"><span class="panel-title"><span class="tool-icon">♙</span>訪問者操作（Visitor）</span></header>
+        <div class="operation-list">
+          <button class="operation-btn" id="calculate-size"><span>計算大小</span><span class="operation-icon">▦</span></button>
+          <button class="operation-btn xml" id="export-xml"><span>XML 匯出</span><span class="operation-icon">♧</span></button>
+        </div>
+        <form class="search-control" id="search-form">
+          <input id="search-query" aria-label="搜尋檔名或副檔名" value=".docx" placeholder="輸入 .docx 或檔名">
+          <button class="search-submit" type="submit">搜尋 ⌕</button>
+        </form>
+      </section>
+
+      <section class="bench-panel observer-panel" aria-label="訪問者進度">
+        <header class="panel-heading observer-title"><span class="panel-title"><span class="tool-icon">⌁</span>監控（Observer）</span><span class="live-pill">LIVE</span></header>
+        <div class="observer-content">
+          <div class="observer-box"><div class="observer-label">目前節點</div><div class="observer-value" id="observer-node">README.txt</div></div>
+          <div class="observer-box">
+            <div class="progress-head"><span class="observer-label">掃描進度</span><span class="progress-number" id="progress-number">0%</span></div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <div class="progress-foot" id="progress-count">0 / 0 Nodes</div>
+          </div>
+          <div class="observer-box" id="visitor-result" hidden><div class="observer-label">Visitor 結果</div><div class="observer-value" id="result-value"></div></div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="bench-panel console-panel" aria-label="操作紀錄">
+      <header class="console-heading"><span class="console-status"></span>CONSOLE</header>
+      <div class="console-output" id="console-output" aria-live="polite"></div>
+    </aside>
+  </main>
+  <dialog class="add-file-dialog" id="add-file-dialog" aria-labelledby="add-file-title">
+    <form class="file-form" id="create-file-form">
+      <h2 id="add-file-title">新增檔案</h2>
+      <p class="form-context">新增至：<span id="destination-path"></span></p>
+      <div class="form-grid">
+        <label class="form-field full">本機檔案
+          <input id="local-file" type="file" accept=".doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.txt,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+        </label>
+        <div class="form-field full">檢查結果
+          <output class="readonly-value" id="detected-file-type">尚未選擇檔案</output>
+        </div>
+        <div class="form-field full">檔名
+          <output class="readonly-value" id="new-file-name">--</output>
+        </div>
+        <div class="form-field full">大小（KB）
+          <output class="readonly-value" id="new-file-size">--</output>
+        </div>
+        <div class="type-fields" id="word-fields" hidden>
+          <div class="form-field full">頁數
+            <output class="readonly-value" id="new-file-pages">--</output>
+          </div>
+        </div>
+        <div class="type-fields" id="image-fields" hidden>
+          <div class="form-field">寬度（px）
+            <output class="readonly-value" id="new-file-width">--</output>
+          </div>
+          <div class="form-field">高度（px）
+            <output class="readonly-value" id="new-file-height">--</output>
+          </div>
+        </div>
+        <div class="type-fields" id="text-fields" hidden>
+          <div class="form-field full">文字編碼
+            <output class="readonly-value" id="new-file-encoding">--</output>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="form-action" id="cancel-add-file" type="button">取消</button>
+        <button class="form-action primary" id="confirm-add-file" type="submit" disabled>確認新增</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+    const state = { tree: null, selectedPath: '', canUndo: false, canRedo: false, clipboard: false, sortKey: null, sortDirection: null, matches: new Set(), selectedFileType: '', inspectedToken: null };
+    const $ = (selector) => document.querySelector(selector);
+    const sleep = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[character]));
+    }
+
+    function formatSize(sizeKb) {
+      if (sizeKb < 1) return `${(sizeKb * 1024).toFixed(0)} B`;
+      if (sizeKb >= 1024) return `${(sizeKb / 1024).toFixed(2)} MB`;
+      return `${Number(sizeKb.toFixed(2))} KB`;
+    }
+
+    function allNodes(node = state.tree) {
+      return node ? [node, ...(node.children || []).flatMap(allNodes)] : [];
+    }
+
+    function selectedNode() {
+      return allNodes().find((node) => node.path === state.selectedPath) || state.tree;
+    }
+
+    function appendLog(text, kind = '') {
+      const line = document.createElement('div');
+      line.className = `console-line ${kind}`;
+      line.textContent = text;
+      $('#console-output').append(line);
+      $('#console-output').scrollTop = $('#console-output').scrollHeight;
+    }
+
+    function updateToolbar() {
+      const node = selectedNode();
+      $('#undo').disabled = !state.canUndo;
+      $('#redo').disabled = !state.canRedo;
+      $('#copy').disabled = !node || node === state.tree;
+      $('#paste').disabled = !state.clipboard || node?.type !== 'directory';
+      $('#delete').disabled = !node || node === state.tree;
+      $('#add-file').disabled = node?.type !== 'directory';
+      document.querySelectorAll('.tag-tool').forEach((button) => {
+        button.disabled = !node;
+        button.setAttribute('aria-pressed', String(Boolean(node?.tags?.includes(button.dataset.tag))));
+        button.querySelector('.tag-count').textContent = allNodes()
+          .filter((item) => item.tags?.includes(button.dataset.tag)).length;
+      });
+      $('#selection-label').textContent = node ? node.displayPath : '尚未選取';
+      $('#observer-node').textContent = node?.name || '尚未選取';
+    }
+
+    function renderNode(node, depth = 1) {
+      const isDirectory = node.type === 'directory';
+      const isSelected = node.path === state.selectedPath;
+      const isMatch = state.matches.has(node.path);
+      const label = isDirectory ? '▰' : node.type === 'Word' ? '▤' : node.type === '圖片' ? '▧' : '▯';
+      const tags = (node.tags || []).map((tag) => `<span class="node-tag ${tag.toLowerCase()}">${escapeHtml(tag)}</span>`).join('');
+      const size = `<span class="node-size">(${formatSize(node.sizeKb)})</span>`;
+      const detail = isDirectory ? '' : node.detail?.replace(/,\s*大小:.*$/, '') || '';
+      const metadata = detail ? `<span class="node-detail">${escapeHtml(detail)}</span>` : '';
+      const row = `<div class="node-row${isSelected ? ' selected' : ''}${isMatch ? ' match' : ''}" data-path="${escapeHtml(node.path)}" role="treeitem" aria-selected="${isSelected}" tabindex="0" style="--depth:${depth}"><span class="node-glyph${isDirectory ? ' folder' : ''}" aria-hidden="true">${label}</span><span class="node-label">${escapeHtml(node.name)}</span>${metadata}${size}<span class="node-tags">${tags}</span></div>`;
+      const children = isDirectory && node.children.length
+        ? `<div class="tree-children" role="group">${node.children.map((child) => renderNode(child, depth + 1)).join('')}</div>`
+        : '';
+      return `<div class="tree-node">${row}${children}</div>`;
+    }
+
+    function renderTree() {
+      if (!state.tree) return;
+      const root = state.tree;
+      const tags = (root.tags || []).map((tag) => `<span class="node-tag ${tag.toLowerCase()}">${escapeHtml(tag)}</span>`).join('');
+      $('#tree-size').textContent = formatSize(root.sizeKb);
+      $('#file-tree').innerHTML = `<div class="tree-root" data-path="${escapeHtml(root.path)}" role="treeitem" aria-selected="${state.selectedPath === root.path}" tabindex="0"><span>▰</span><span>${escapeHtml(root.name)}</span><small>(${formatSize(root.sizeKb)})</small><span class="node-tags">${tags}</span></div><div class="tree-children" role="group">${root.children.map((child) => renderNode(child)).join('')}</div>`;
+      updateToolbar();
+    }
+
+    async function loadTree(preserveSelection = true) {
+      const response = await fetch('/api/tree');
+      if (!response.ok) throw new Error('無法讀取檔案階層');
+      state.tree = await response.json();
+      const existing = allNodes().some((node) => node.path === state.selectedPath);
+      if (!preserveSelection || !existing) state.selectedPath = state.tree.path;
+      renderTree();
+    }
+
+    async function post(url, options = {}) {
+      const response = await fetch(url, { ...options, method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '操作失敗');
+      if (typeof result.canUndo === 'boolean') state.canUndo = result.canUndo;
+      if (typeof result.canRedo === 'boolean') state.canRedo = result.canRedo;
+      if (result.tree) state.tree = result.tree;
+      if (result.message) appendLog(result.message, 'success');
+      renderTree();
+      return result;
+    }
+
+    async function animateObserver(paths, total) {
+      const count = paths.length;
+      $('#progress-count').textContent = `0 / ${total} Nodes`;
+      $('#progress-number').textContent = '0%';
+      $('#progress-fill').style.width = '0%';
+      for (let index = 0; index < count; index += 1) {
+        const path = paths[index];
+        $('#observer-node').textContent = path.split(' -> ').at(-1);
+        const percent = Math.round(((index + 1) / total) * 100);
+        $('#progress-number').textContent = `${percent}%`;
+        $('#progress-fill').style.width = `${percent}%`;
+        $('#progress-count').textContent = `${index + 1} / ${total} Nodes`;
+        appendLog(`掃描節點: ${path}`, 'muted');
+        await sleep(45);
+      }
+    }
+
+    function showResult(text) {
+      $('#visitor-result').hidden = false;
+      $('#result-value').textContent = text;
+      const result = document.createElement('div');
+      result.className = 'console-result';
+      result.textContent = text;
+      $('#console-output').append(result);
+    }
+
+    async function runSizeVisitor() {
+      try {
+        const selected = selectedNode();
+        const directoryPath = selected?.type === 'directory'
+          ? selected.path
+          : selected?.path.split(' -> ').slice(0, -1).join(' -> ');
+        const directory = allNodes().find(node => node.type === 'directory' && node.path === directoryPath);
+        if (!directory) return showToast('請先選取要計算容量的資料夾。');
+
+        $('#visitor-result').hidden = true;
+        $('#result-value').textContent = '';
+        appendLog(`啟動 SizeCalculateVisitor：${directory.path}`, 'warning');
+        const response = await fetch(`/api/visitor/size?path=${encodeURIComponent(directory.path)}`, { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '容量計算失敗。');
+        await animateObserver(data.visitedPaths, data.totalNodes);
+        const size = formatSize(data.totalSizeKb);
+        showResult(`${data.directoryName} 總容量：${size}`);
+        appendLog(`${data.directoryName} 計算完成：${size}`, 'success');
+      } catch (error) { showToast(error.message); }
+    }
+
+    async function runSearchVisitor(query) {
+      if (!query.trim()) return showToast('請輸入副檔名或檔名。');
+      try {
+        appendLog(`啟動 SearchVisitor：${query}`, 'warning');
+        const response = await fetch(`/api/visitor/search?query=${encodeURIComponent(query)}`, { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '搜尋失敗');
+        await animateObserver(data.visitedPaths, data.totalNodes);
+        const resultPaths = data.results;
+        state.matches = new Set(resultPaths
+          .map((path) => allNodes().find((node) => node.displayPath === path)?.path)
+          .filter(Boolean));
+        renderTree();
+        resultPaths.forEach((path) => appendLog(`[符合] ${path}`, 'success'));
+        showResult(`找到 ${resultPaths.length} 項`);
+        if (resultPaths.length === 0) appendLog('沒有符合的檔案', 'muted');
+      } catch (error) { showToast(error.message); }
+    }
+
+    async function handleCommand(action) {
+      try {
+        const node = selectedNode();
+        if (!node) return;
+        const path = encodeURIComponent(node.path);
+        if (action === 'copy') {
+          const result = await post(`/api/commands/copy?path=${path}`);
+          state.clipboard = result.canPaste;
+          updateToolbar();
+          return;
+        }
+        if (action === 'paste') {
+          if (node.type !== 'directory') return showToast('請先選取目的資料夾。');
+          await post(`/api/commands/paste?path=${path}`);
+          state.matches.clear();
+          return;
+        }
+        if (action === 'delete' && !window.confirm(`確定刪除「${node.name}」？`)) return;
+        await post(`/api/commands/${action}?path=${path}`);
+        if (action === 'delete') {
+          state.selectedPath = node.path.split('/').slice(0, -1).join('/');
+          renderTree();
+        }
+        state.matches.clear();
+      } catch (error) { showToast(error.message); }
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.body.append(toast);
+      window.setTimeout(() => toast.remove(), 2500);
+    }
+
+    $('#file-tree').addEventListener('click', (event) => {
+      const row = event.target.closest('[data-path]');
+      if (!row) return;
+      state.selectedPath = row.dataset.path;
+      state.matches.clear();
+      renderTree();
+      appendLog(`選取節點: ${selectedNode()?.displayPath || state.selectedPath}`, 'muted');
+    });
+    $('#file-tree').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') event.target.closest('[data-path]')?.click();
+    });
+    $('#calculate-size').addEventListener('click', runSizeVisitor);
+    $('#add-file').addEventListener('click', async () => {
+      const destination = selectedNode();
+      if (destination?.type !== 'directory') return;
+      await discardInspection();
+      $('#destination-path').textContent = destination.displayPath;
+      $('#create-file-form').reset();
+      $('#local-file').value = '';
+      resetInspectionResult();
+      $('#detected-file-type').textContent = '尚未選擇檔案';
+      updateFileTypeFields();
+      $('#add-file-dialog').showModal();
+    });
+    $('#cancel-add-file').addEventListener('click', () => {
+      discardInspection();
+      $('#add-file-dialog').close();
+    });
+    $('#add-file-dialog').addEventListener('close', discardInspection);
+    $('#local-file').addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      await discardInspection();
+      resetInspectionResult();
+      $('#detected-file-type').textContent = '正在讀取檔案內容…';
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const response = await fetch('/api/files/inspect', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '檔案讀取失敗。');
+        state.inspectedToken = result.token;
+        state.selectedFileType = result.type;
+        $('#new-file-name').textContent = result.name;
+        $('#new-file-size').textContent = `${formatSize(result.sizeKb)} (${result.sizeKb.toFixed(2)} KB)`;
+        $('#detected-file-type').textContent = result.type;
+        if (result.pages != null) $('#new-file-pages').textContent = `${result.pages} 頁`;
+        if (result.width != null) $('#new-file-width').textContent = result.width;
+        if (result.height != null) $('#new-file-height').textContent = result.height;
+        if (result.encoding) $('#new-file-encoding').textContent = result.encoding;
+        updateFileTypeFields();
+        $('#confirm-add-file').disabled = false;
+      } catch (error) {
+        $('#detected-file-type').textContent = error.message;
+        state.selectedFileType = '';
+        updateFileTypeFields();
+        showToast(error.message);
+      }
+    });
+
+    function resetInspectionResult() {
+      state.inspectedToken = null;
+      for (const id of ['new-file-name', 'new-file-size', 'new-file-pages', 'new-file-width', 'new-file-height', 'new-file-encoding']) {
+        $(`#${id}`).textContent = '--';
+      }
+      $('#confirm-add-file').disabled = true;
+    }
+
+    async function discardInspection() {
+      if (!state.inspectedToken) return;
+      const token = state.inspectedToken;
+      state.inspectedToken = null;
+      await fetch(`/api/files/inspect/${token}`, { method: 'DELETE' }).catch(() => {});
+    }
+
+    function updateFileTypeFields() {
+      const type = state.selectedFileType;
+      for (const [id, visible] of [['word-fields', type === 'Word'], ['image-fields', type === '圖片'], ['text-fields', type === '文字']]) {
+        const section = $(`#${id}`);
+        section.hidden = !visible;
+      }
+    }
+    $('#create-file-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const destination = selectedNode();
+      if (destination?.type !== 'directory') return showToast('請先選取目的資料夾。');
+      if (!state.inspectedToken) return showToast('請先成功讀取檔案內容。');
+      const inspectedToken = state.inspectedToken;
+      const name = $('#new-file-name').textContent;
+      try {
+        const result = await post('/api/commands/create-file', {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: destination.path, token: inspectedToken })
+        });
+        state.inspectedToken = null;
+        state.selectedPath = result.path;
+        renderTree();
+        $('#add-file-dialog').close();
+        appendLog(`已加入 ${name}；中繼資料來自檔案檢查`, 'success');
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+    $('#export-xml').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/export/xml');
+        if (!response.ok) throw new Error('XML 匯出失敗');
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'cloud-files.xml';
+        link.click();
+        URL.revokeObjectURL(link.href);
+        appendLog('XML 匯出完成', 'success');
+      } catch (error) { showToast(error.message); }
+    });
+    $('#search-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      runSearchVisitor($('#search-query').value);
+    });
+    $('#undo').addEventListener('click', () => handleCommand('undo'));
+    $('#redo').addEventListener('click', () => handleCommand('redo'));
+    $('#copy').addEventListener('click', () => handleCommand('copy'));
+    $('#paste').addEventListener('click', () => handleCommand('paste'));
+    $('#delete').addEventListener('click', () => handleCommand('delete'));
+    document.querySelectorAll('.tag-tool').forEach((button) => button.addEventListener('click', async () => {
+      const node = selectedNode();
+      if (!node) return;
+      try {
+        const query = new URLSearchParams({ path: node.path, tag: button.dataset.tag });
+        await post(`/api/commands/tag?${query}`);
+      } catch (error) { showToast(error.message); }
+    }));
+    document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', async () => {
+      const selected = selectedNode();
+      const directory = selected?.type === 'directory' ? selected : allNodes().find((node) => node.path === selected?.path.split('/').slice(0, -1).join('/'));
+      if (!directory || directory.type !== 'directory') return showToast('請選擇資料夾以排序。');
+      const sortKey = button.dataset.sort;
+      const direction = state.sortKey === sortKey && state.sortDirection === 'desc' ? 'asc' : 'desc';
+      try {
+        const query = new URLSearchParams({ path: directory.path, by: sortKey, ascending: String(direction === 'asc') });
+        const data = await post(`/api/sort?${query}`);
+        state.sortKey = sortKey;
+        state.sortDirection = direction;
+        document.querySelectorAll('[data-sort]').forEach((item) => {
+          const active = item === button;
+          item.classList.toggle('active', active);
+          item.querySelector('.sort-direction').textContent = active ? direction === 'desc' ? '↓' : '↑' : '↕';
+          item.setAttribute('aria-label', `依${item.dataset.label}排序，目前${active ? direction === 'desc' ? '降冪' : '升冪' : '首次降冪'}`);
+        });
+        appendLog(data.message, 'success');
+      } catch (error) { showToast(error.message); }
+    }));
+
+    loadTree(false).then(() => {
+      appendLog(`工作區載入完成：${allNodes().length} 個節點`, 'success');
+      appendLog('Observer 已就緒，等待 Visitor 操作', 'muted');
+    }).catch((error) => {
+      $('#file-tree').innerHTML = `<div class="empty-tree">${escapeHtml(error.message)}</div>`;
+      appendLog(error.message, 'warning');
+    });
+  </script>
+</body>
+</html>
