@@ -1,5 +1,6 @@
 # 雲端檔案管理系統 — 領域模型分析與實作 (.NET 8 Core)
 
+## ER Model 與 架構圖放在docs資料夾內 ##
 ## 操作影片連結 https://youtu.be/idELGoxexTw ##
 
 ## 🚀 1. 快速導覽：考題功能與設計模式對應表
